@@ -126,10 +126,26 @@ def write_markdown(conv: dict, output_dir: Path):
         f.writelines(lines)
 
 
-def run_scrape(export_dir: Path, output_dir: Path) -> dict:
-    """Scrape all conversations-*.json in export_dir → markdown files in output_dir."""
+def run_scrape(export_dir: Path, output_dir: Path, force: bool = False) -> dict:
+    """Scrape all conversations-*.json in export_dir → markdown files in output_dir.
+
+    Skips scraping if output_dir already contains markdown files that are newer
+    than all source JSON files (use force=True to override).
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     input_files = sorted(export_dir.glob("conversations-*.json"))
+    if not input_files:
+        return {"conversations": 0, "messages": 0, "skipped": False,
+                "error": f"No conversations-*.json files found in {export_dir}"}
+
+    # Skip if output is already fresh
+    if not force and any(output_dir.glob("*.md")):
+        newest_source = max(f.stat().st_mtime for f in input_files)
+        oldest_output = min(f.stat().st_mtime for f in output_dir.glob("*.md"))
+        if oldest_output >= newest_source:
+            md_count = sum(1 for _ in output_dir.glob("*.md"))
+            return {"conversations": md_count, "messages": 0, "skipped": True}
+
     total_convs = total_msgs = 0
     for input_file in input_files:
         for conv in extract_conversations(input_file):
@@ -137,7 +153,7 @@ def run_scrape(export_dir: Path, output_dir: Path) -> dict:
                 write_markdown(conv, output_dir)
                 total_msgs += len(conv["messages"])
                 total_convs += 1
-    return {"conversations": total_convs, "messages": total_msgs}
+    return {"conversations": total_convs, "messages": total_msgs, "skipped": False}
 
 
 def main():

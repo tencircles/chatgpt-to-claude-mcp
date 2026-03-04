@@ -35,6 +35,9 @@ SIGNAL_PHRASES = [
     "insane", "the problem", "okay so", "okay it's",
 ]
 
+# User-supplied extra signal phrases loaded at runtime from signal_phrases.json
+EXTRA_SIGNAL_PHRASES: list[str] = []
+
 STOPWORDS = {
     # common English
     "the","a","an","and","or","but","in","on","at","to","for","of","with",
@@ -44,57 +47,25 @@ STOPWORDS = {
     "just","like","get","got","can","will","would","could","should","also",
     "very","more","some","what","when","how","all","one","out","he","she",
     "which","who","him","her","his","me","my","i","yeah","ok","okay",
-    # pasted log/debug output
-    "warning","logtemp","logblueprintusermessages","info","trace","sending",
-    # physics variable names (tire model / vehicle sim code)
-    "tire","vvert","vlong","vlat","normalforce","slopescale","staticload",
-    "effmass","deltaratio","smoothdelta","vertforce","latforce","latmagnitude",
-    "slipratio","forwardalpha","wheelomega","wheelvelocity","longpacejka",
-    "gravityslope","longmagnitude","longforce","ellipsescale","totalforce",
-    "frontdrift","reardrift","rearaccel","frontaccel","steerang","dotproduct",
-    "zerovector","gripsettings","gripx","gripy","latload","slipangle","slipang",
-    "springsettings","restlen","slopefactor","leverarm","yawtorque","tireforce",
-    "updatetireforces","forwardspeedmod","latmagnitude","ellipse","stiff",
-    "fade","slope","atan","sin","rad","deg","curved","shaped","fwd","peak",
-    "compression","float","const","fvector",
-    # code / file tokens
+    # pasted log/debug output (universal — any tool can emit these)
+    "warning","info","trace","error","debug","null","undefined","true","false",
+    # code / file tokens (universal)
     "src","bin","bytes","webp","png","jpg","gif","jsx","dom","export","return",
-    "https","www","com","http",
-    # LSP / editor noise
-    "textdocument","didopen","notification","sediment",
-    # usernames / handles
-    "silentfactory","chrisconiglio","nvizzio","tencircles","feelslike","gweb",
-    # UI / frontend code tokens
-    "controller","assets","images","artboards","app","mode","public",
-    "components","pages","dom","jsx","blockid","spaceid","craftdocs","repos",
-    # physics / math (remaining)
-    "mag","torque","inputs","params","longitudinal","lateral","slip","velocity",
-    "alpha","delta","lat","fmath","abs","restlength","springlength","wheelradius",
-    "fwdmod","slipin","rawmag","spring","length","shape","curve","raw",
-    # devops / system noise
-    "ssh","cpu","throw","logaudiomixer","display","designentry","bmagnet","binair",
-    "configuration","engine","git","push","pull","commit","branch","clone","merge",
-    # remaining physics interpolation variables
-    "deltainterpspeed","smoothinterpspeed","restlength","springlength",
+    "https","www","com","http","json","api","url","html","css","var","let","const",
+    # LSP / editor noise (universal)
+    "textdocument","didopen","notification",
+    # common devops tokens (universal)
+    "ssh","cpu","git","push","pull","commit","branch","clone","merge",
+    # UI tokens that appear in pasted code (universal)
+    "controller","assets","components","pages","app","mode","public",
 }
 
-# Bigrams to suppress even if individual words pass the stopword filter
+# Bigrams to suppress even if individual words pass the stopword filter (universal noise)
 BIGRAM_STOPWORDS = {
-    "chris coniglio","silent factory","let know","forward right",
-    "sub steps","speed speed","cloud demo","right now","don know",
-    "mag mag","repos cloud","avatar ago","chris chris",
-    "subject verb","verb object","noun enemy","noun weapon","noun cosmetic",
-    "noun location","noun effect","kind name","alpha delta","slip angle",
-    "file service","service file","right drift","drift forward",
-    "right mag","total drift","don think","don want","don need","don really",
-    "build started","ago looks","best chris","hey chris",
-    "logaudiomixer display","steps designentry","throw new",
-    "configuration development","development any","any cpu","engine source",
-    "users ssh","context mode","mode context","state context",
-    "binair bmagnet","raw params","params inputs","inputs velocity",
-    # remaining physics / generic noise bigrams
-    "right right","speed result","result total","drift final","final drift",
-    "create next","speed speed","drift speed",
+    "right now","don know","don think","don want","don need","don really",
+    "let know","build started","create next",
+    "file service","service file",
+    "context mode","mode context","state context",
 }
 
 
@@ -154,18 +125,23 @@ def build_frequency(all_text: str, top_n: int):
 
 def find_signal_lines(all_lines: list[str]) -> list[tuple[int, str]]:
     """Return (line_index, line) for lines matching signal phrases, minus artifacts."""
+    active_phrases = SIGNAL_PHRASES + EXTRA_SIGNAL_PHRASES
     artifact_re = re.compile(
         r"file-service://|sediment://|image_asset_pointer|audio_asset_pointer"
         r"|audio_transcription|real_time_user|asset_pointer"
         r"|private key|git |\.git|ssh-|BEGIN RSA|BEGIN EC"
-        r"|nvizzio|sylvain|constantin|yves|gamevestor|ivan"
     )
+    banned_re = re.compile(
+        "|".join(re.escape(b) for b in BANNED_PHRASES)
+    ) if BANNED_PHRASES else None
     results = []
     for idx, line in enumerate(all_lines):
         if artifact_re.search(line):
             continue
+        if banned_re and banned_re.search(line.lower()):
+            continue
         lower = line.lower()
-        if any(phrase in lower for phrase in SIGNAL_PHRASES):
+        if any(phrase in lower for phrase in active_phrases):
             results.append((idx, line.strip()))
     return results
 
@@ -251,16 +227,35 @@ def load_banned_phrases(export_dir: Path) -> set[str]:
 
 def save_banned_phrases(export_dir: Path, phrases: set[str]) -> None:
     config_path = export_dir / "banned_phrases.json"
-    config_path.write_text(json.dumps(sorted(phrases), indent=2))
+    config_path.write_text(json.dumps(sorted(p.lower() for p in phrases), indent=2))
+
+
+def load_signal_phrases(export_dir: Path) -> list[str]:
+    """Load user-added signal phrases from export_dir/signal_phrases.json."""
+    config_path = export_dir / "signal_phrases.json"
+    if config_path.exists():
+        return json.loads(config_path.read_text())
+    return []
+
+
+def save_signal_phrases(export_dir: Path, phrases: list[str]) -> None:
+    config_path = export_dir / "signal_phrases.json"
+    config_path.write_text(json.dumps(sorted(set(p.lower().strip() for p in phrases)), indent=2))
 
 
 def run_extraction(input_dir: Path, output_dir: Path,
-                   banned: set[str] | None = None) -> dict:
-    """Run the full extraction pipeline. Returns stats + paths to output files."""
-    global BANNED_PHRASES
-    BANNED_PHRASES = banned or set()
+                   banned: set[str] | None = None,
+                   extra_signal: list[str] | None = None) -> dict:
+    """Run the full extraction pipeline. Wipes output_dir first for a clean run."""
+    global BANNED_PHRASES, EXTRA_SIGNAL_PHRASES
+    BANNED_PHRASES = {p.lower() for p in (banned or set())}
+    EXTRA_SIGNAL_PHRASES = [p.lower().strip() for p in (extra_signal or [])]
 
-    output_dir.mkdir(exist_ok=True)
+    # Wipe and recreate for a pure pipeline — no stale artefacts
+    import shutil
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True)
     md_files = sorted(input_dir.glob("*.md"))
 
     all_user_text_parts = []
@@ -311,6 +306,8 @@ def run_extraction(input_dir: Path, output_dir: Path,
         "dense_signal_lines": len(dense_lines),
         "top_proper_nouns": [{"word": w, "count": c} for w, c in proper_noun_freq],
         "top_phrases": top_bigrams,
+        "default_signal_phrases": SIGNAL_PHRASES,
+        "extra_signal_phrases": EXTRA_SIGNAL_PHRASES,
         "output_dir": str(output_dir),
     }
 
