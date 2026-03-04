@@ -291,8 +291,9 @@ def run_extraction(input_dir: Path, output_dir: Path,
     dense_path = output_dir / "dense_signal.txt"
     dense_path.write_text("\n".join(dense_lines), encoding="utf-8")
 
-    # Extract top proper nouns (capitalised words not in stopwords) for user review
-    all_tokens = re.findall(r"\b[A-Z][a-z]{2,}\b", all_user_text)
+    # Extract top proper nouns — capitalised words that appear mid-sentence
+    # (i.e., NOT at the start of a line, to avoid sentence-initial false positives)
+    all_tokens = re.findall(r"(?<=[a-z,;:]\s)[A-Z][a-z]{2,}", all_user_text)
     proper_noun_freq = Counter(
         t for t in all_tokens if t.lower() not in STOPWORDS
     ).most_common(30)

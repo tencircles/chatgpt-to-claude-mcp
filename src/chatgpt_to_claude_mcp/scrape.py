@@ -128,7 +128,7 @@ def write_markdown(conv: dict, output_dir: Path):
 
 def run_scrape(export_dir: Path, output_dir: Path) -> dict:
     """Scrape all conversations-*.json in export_dir → markdown files in output_dir."""
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
     input_files = sorted(export_dir.glob("conversations-*.json"))
     total_convs = total_msgs = 0
     for input_file in input_files:
