@@ -27,10 +27,10 @@ mcp = FastMCP(
     "chatgpt-to-claude",
     instructions=(
         "Guide the user through building a personal context profile from their "
-        "ChatGPT export. Use process_export first, review the top proper nouns "
-        "with the user, then call process_export again with any banned phrases. "
-        "Synthesise the profile yourself from the returned dense_signal text, "
-        "then call save_profile to install it."
+        "ChatGPT export. Use process_export first, then enter a review loop: "
+        "show the user top_proper_nouns and top_phrases, ask them to flag anything "
+        "irrelevant or sensitive, call process_export again with updated banned_phrases, "
+        "repeat until the user approves the list. Then synthesise and call save_profile."
     ),
 )
 
@@ -48,6 +48,11 @@ Identify and capture:
 - Decision-making patterns and heuristics
 - Preferences and hard dislikes
 - Life circumstances (work situation, location, financial context, family if evident)
+
+PRIVACY: Do NOT include full surnames, precise addresses, financial figures, third-party
+personal details (family members' names beyond first names, colleagues, counterparties),
+or anything that could identify or expose the user if this file were accidentally shared.
+Generalise where needed (e.g. "based in Europe" not a specific city; "has a daughter" not her name).
 
 OUTPUT REQUIREMENTS:
 - ~3000 characters maximum. Hard limit. Every sentence must change how an AI responds.
@@ -102,15 +107,22 @@ def process_export(
     return {
         "stats": {**scrape_stats, **extract_stats},
         "top_proper_nouns": extract_stats["top_proper_nouns"],
+        "top_phrases": extract_stats["top_phrases"],
         "banned_phrases": sorted(combined_banned),
         "synthesis_prompt": SYNTHESIS_PROMPT,
         "dense_signal": dense_signal,
         "frequency_summary": freq_snippet,
         "next_step": (
-            "Review top_proper_nouns with the user. Ask if any should be excluded. "
-            "If yes, call process_export again with the updated banned_phrases list. "
-            "Then synthesise the profile from dense_signal using the synthesis_prompt, "
-            "and call save_profile with the result."
+            "REVIEW LOOP — do not skip:\n"
+            "1. Show the user top_proper_nouns and top_phrases side by side.\n"
+            "2. Ask: 'Do any of these look irrelevant, outdated, or sensitive? "
+            "List anything you'd like to exclude, or say \"looks good\" to continue.'\n"
+            "3. Also ask: 'Is there any private information you'd like kept out — "
+            "full names, locations, financial details, people you'd rather not mention?'\n"
+            "4. If the user adds bans → call process_export again with the updated "
+            "banned_phrases list. Repeat from step 1.\n"
+            "5. Only when the user explicitly approves → synthesise the profile from "
+            "dense_signal using the synthesis_prompt, then call save_profile."
         ),
     }
 

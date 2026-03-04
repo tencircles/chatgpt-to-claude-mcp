@@ -298,12 +298,19 @@ def run_extraction(input_dir: Path, output_dir: Path,
         t for t in all_tokens if t.lower() not in STOPWORDS
     ).most_common(30)
 
+    # Top bigrams — reveal recurring topics and verb phrases
+    top_bigrams = [
+        {"phrase": bg, "count": c}
+        for bg, c in bigram_freq[:40]
+    ]
+
     return {
         "md_files": len(md_files),
         "user_messages": len(all_user_text_parts),
         "dense_signal_chars": dense_path.stat().st_size,
         "dense_signal_lines": len(dense_lines),
         "top_proper_nouns": [{"word": w, "count": c} for w, c in proper_noun_freq],
+        "top_phrases": top_bigrams,
         "output_dir": str(output_dir),
     }
 
