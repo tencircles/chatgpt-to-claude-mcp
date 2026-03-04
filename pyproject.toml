@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chatgpt-to-claude-mcp"
+version = "0.1.0"
+description = "Convert your ChatGPT export into a personal context profile for Claude and GitHub Copilot"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",
+    "ijson>=3.2.0",
+]
+
+[project.scripts]
+chatgpt-to-claude-mcp = "chatgpt_to_claude_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/chatgpt_to_claude_mcp"]
