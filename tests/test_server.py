@@ -92,6 +92,14 @@ def test_save_profile_local_backup_preserves_old_content(isolated_profile, tmp_p
     assert local_backup.read_text() == OLD_PROFILE
 
 
+def test_save_profile_no_backup_when_content_unchanged(isolated_profile, tmp_path):
+    """If profile content hasn't changed, no backup is created."""
+    isolated_profile.write_text(NEW_PROFILE)
+    result = save_profile(NEW_PROFILE, str(tmp_path))
+    assert result["global_backup"] is None
+    assert result["local_backup"] is None
+
+
 def test_save_profile_does_not_overwrite_backup_with_new_content(isolated_profile, tmp_path):
     """Regression: backup must NOT contain the new profile content."""
     isolated_profile.write_text(OLD_PROFILE)

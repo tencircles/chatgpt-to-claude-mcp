@@ -245,14 +245,14 @@ def save_profile(
 
     local_profile = local_dir / "profile.md"
     local_backup = None
-    if local_profile.exists():
+    if local_profile.exists() and local_profile.read_text(encoding="utf-8") != profile_content:
         local_backup = local_dir / f"profile_{ts}.md"
         shutil.copy2(local_profile, local_backup)
     local_profile.write_text(profile_content, encoding="utf-8")
 
     PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     global_backup = None
-    if PROFILE_PATH.exists() and not PROFILE_PATH.is_symlink():
+    if PROFILE_PATH.exists() and not PROFILE_PATH.is_symlink() and PROFILE_PATH.read_text(encoding="utf-8") != profile_content:
         global_backup = PROFILE_PATH.with_stem(f"profile_{ts}")
         PROFILE_PATH.rename(global_backup)
     PROFILE_PATH.write_text(profile_content, encoding="utf-8")
