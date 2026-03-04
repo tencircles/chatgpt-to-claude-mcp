@@ -138,16 +138,12 @@ def save_profile(
     local_profile.parent.mkdir(parents=True, exist_ok=True)
     local_profile.write_text(profile_content, encoding="utf-8")
 
-    # Global copy — write to a versioned file, then update the canonical symlink
+    # Global copy — backup existing file with timestamp before writing
     PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     if PROFILE_PATH.exists() and not PROFILE_PATH.is_symlink():
-        # Find next available versioned backup
-        i = 1
-        while True:
-            backup = PROFILE_PATH.with_stem(f"profile-{i:02d}")
-            if not backup.exists():
-                break
-            i += 1
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = PROFILE_PATH.with_stem(f"profile_{ts}")
         PROFILE_PATH.rename(backup)
         backed_up_to = str(backup)
     else:
