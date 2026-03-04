@@ -11,12 +11,13 @@ The pipeline runs entirely locally. It never sends your conversation data anywhe
 1. **Stream** `conversations-*.json` using `ijson` — never loads the full file into memory
 2. **Extract** user-only messages (assistant responses are just mirrors of your input)
 3. **Score** lines by a weighted blend of word frequency relevance (60%) and Shannon entropy (40%), with context window expansion (±0–3 surrounding lines)
-4. **Surface** the top proper nouns from your history — names, projects, companies — and ask which to exclude as noise (old employers, irrelevant contacts, etc.)
-5. **Re-run** with updated banned phrases for a cleaner signal
-6. **Synthesise** a profile via the LLM from the dense signal text
-7. **Install** globally at `~/.config/profile.md` with symlinks for Claude (`~/.claude/CLAUDE.md`) and Copilot (`~/.copilot/copilot-instructions.md`)
+4. **Surface** top proper nouns and bigrams from your history — review and flag noise (old employers, irrelevant contacts, etc.)
+5. **Optionally add** domain-specific signal phrases (e.g. `"my game"`, `"my startup"`) to boost relevant context
+6. **Re-run** with updated config until the signal looks clean
+7. **Read** the dense signal text, then synthesise a profile via the LLM
+8. **Install** globally at `~/.config/profile.md`
 
-Banned phrases are persisted to `{export_dir}/banned_phrases.json` so they survive reruns.
+Banned phrases persist to `{export_dir}/banned_phrases.json` and signal phrases to `{export_dir}/signal_phrases.json` so they survive reruns.
 
 ## Requirements
 
@@ -67,16 +68,23 @@ chatgpt-to-claude-mcp
 
 ## Tools
 
-### `process_export(export_dir, banned_phrases?)`
+### `process_export(export_dir, banned_phrases?, extra_signal_phrases?)`
 
 Runs the full pipeline. Returns:
-- `top_proper_nouns` — review these with the user, flag irrelevant ones
-- `dense_signal` — scored excerpts for profile synthesis
-- `synthesis_prompt` — prompt to use when synthesising the profile
+- `top_proper_nouns` — flag irrelevant ones to ban
+- `top_phrases` — top bigrams, also available for banning
+- `default_signal_phrases` — built-in signal markers
+- `extra_signal_phrases` — your persisted domain-specific additions
+- `signal_lines` / `signal_chars` — size of the dense signal for review
+- `synthesis_prompt` — prompt to use when synthesising
+
+### `read_signal(export_dir, max_lines?)`
+
+Read the dense signal file after approving the config. Signal is scored highest-first — truncating from the bottom loses the least. Returns the text and a frequency summary.
 
 ### `save_profile(profile_content, export_dir)`
 
-Writes the synthesised profile and installs symlinks.
+Writes the synthesised profile to `~/.config/profile.md` (with timestamped backup if content has changed) and saves a local copy in `{export_dir}/extracted/profile.md`.
 
 ## Getting your ChatGPT export
 
