@@ -138,8 +138,20 @@ def save_profile(
     local_profile.parent.mkdir(parents=True, exist_ok=True)
     local_profile.write_text(profile_content, encoding="utf-8")
 
-    # Global copy
+    # Global copy — write to a versioned file, then update the canonical symlink
     PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if PROFILE_PATH.exists() and not PROFILE_PATH.is_symlink():
+        # Find next available versioned backup
+        i = 1
+        while True:
+            backup = PROFILE_PATH.with_stem(f"profile-{i:02d}")
+            if not backup.exists():
+                break
+            i += 1
+        PROFILE_PATH.rename(backup)
+        backed_up_to = str(backup)
+    else:
+        backed_up_to = None
     PROFILE_PATH.write_text(profile_content, encoding="utf-8")
 
     # Symlinks
@@ -153,6 +165,7 @@ def save_profile(
 
     return {
         "saved_to": str(local_profile),
+        "backed_up_to": backed_up_to,
         "installed_at": installed,
         "characters": len(profile_content),
     }
